@@ -46,6 +46,9 @@ export default function Display() {
     columnHelper.accessor("category", {
       header: "Category",
     }),
+    columnHelper.accessor("Actions", {
+      header: "Actions",
+    }),
   ];
 
   const table = useReactTable({
