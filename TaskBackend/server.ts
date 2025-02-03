@@ -21,6 +21,7 @@ app.use(express.json());
 app.use(
   cors()
 );
+
 const createContext = ({ req, res }: { req: express.Request; res: express.Response }) => {
   console.log('Context initialized');
   return {};

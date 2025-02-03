@@ -54,18 +54,18 @@ export const taskRouter = t.router({
     return await Task.find();
   }),
 
-  getTaskByID: t.procedure
-  .input(z.object({ id: z.number() }))
-  .query(async ({ input }) => {
-    console.log("Received input in getTaskByID:", input); 
-    const { id } = input;
+  // getTaskByID: t.procedure
+  // .input(z.object({ id: z.number() }))
+  // .query(async ({ input }) => {
+  //   console.log("Received input in getTaskByID:", input); 
+  //   const { id } = input;
 
-    const task = await Task.findOne({ id });
-    if (!task) {
-      throw new Error("Task Not Found");
-    }
-    return { data: task };
-  }),
+  //   const task = await Task.findOne({ id });
+  //   if (!task) {
+  //     throw new Error("Task Not Found");
+  //   }
+  //   return { data: task };
+  // }),
 
   updateTask: t.procedure
     .input(
