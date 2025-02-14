@@ -8,10 +8,29 @@
       "path": "./tsconfig.node.json"
     }
   ],
+  // "compilerOptions": {
+  //   "baseUrl": "./src",
+  //   "paths": {
+  //     "~/*": ["*"],
+  //     "@types/*": ["../types/*"] 
+  //   },
+  //   "typeRoots": [
+  //     "./node_modules/@types",
+  //     "../types"
+  //   ]
+  // }
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "~/*": [
+        "*"
+      ],
+      "@types/*": [
+        "../types/*"
+      ]
     }
   }
 }

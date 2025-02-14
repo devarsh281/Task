@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+
 import {
   useReactTable,
   createColumnHelper,
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
+import { trpc } from "../../utils/trpc";
 
 interface Task {
   id: number;
@@ -13,54 +15,38 @@ interface Task {
   category: string;
 }
 
-const fetchTasks = async (): Promise<any> => {
-  const response = await fetch("http://localhost:8085/trpc/task.getAllTasks", {
-    method: "GET",
-  });
-  const data = await response.json();
-  return data;
-};
-
 export default function Display() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { data, refetch } = trpc.task.getAllTasks.useQuery();
+  const tasks: Task[] = (data as Task[]) || [];
+  const updateTaskMutation = trpc.task.updateTask.useMutation({
+    onSuccess: () => refetch(),
+  });
+  const deleteTaskMutation = trpc.task.deleteTask.useMutation({
+    onSuccess: () => refetch(),
+  });
+
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] = useState("");
 
-  useEffect(() => {
-    const getTasks = async () => {
-      const tasksData = await fetchTasks();
-      setTasks(tasksData?.result?.data);
-    };
-    getTasks();
-  }, []);
-
   const columnHelper = createColumnHelper<Task>();
   const columns = [
-    columnHelper.accessor("id", {
-      header: "ID",
-    }),
-    columnHelper.accessor("title", {
-      header: "Title",
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-    }),
-    columnHelper.accessor("category", {
-      header: "Category",
-    }),
-    columnHelper.accessor("Actions", {
+    columnHelper.accessor("id", { header: "ID" }),
+    columnHelper.accessor("title", { header: "Title" }),
+    columnHelper.accessor("description", { header: "Description" }),
+    columnHelper.accessor("category", { header: "Category" }),
+    columnHelper.display({
+      id: "actions",
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEdit(row.original.id)}
+            onClick={() => handleEdit(row.original)}
             className="!text-blue-500 hover:!text-blue-700 !bg-green-100 hover:!bg-green-300"
           >
             Edit
           </button>
-
           <button
             onClick={() => handleDelete(row.original.id)}
             className="text-red-500 hover:text-red-700 !bg-red-100 hover:!bg-red-400"
@@ -78,71 +64,28 @@ export default function Display() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const handleEdit = (id: number) => {
-    const taskToEdit = tasks.find((task) => task.id === id);
-    if (taskToEdit) {
-      setEditingTask(taskToEdit);
-      setNewTitle(taskToEdit.title);
-      setNewDescription(taskToEdit.description);
-      setNewCategory(taskToEdit.category);
-    }
+  const handleEdit = (task: Task) => {
+    setEditingTask(task);
+    setNewTitle(task.title);
+    setNewDescription(task.description);
+    setNewCategory(task.category);
   };
 
-  const handleEditSubmit = async (updatedTask: Task): Promise<void> => {
-    try {
-      const response = await fetch(
-        "http://localhost:8085/trpc/task.updateTask",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: updatedTask.id, task: updatedTask }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Task Updated Sucessfully", data);
-
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === updatedTask.id ? { ...task, ...updatedTask } : task
-        )
-      );
-      setEditingTask(null);
-    } catch (error) {
-      console.error("Error updating task:", error);
-    }
+  const handleEditSubmit = () => {
+    if (!editingTask) return;
+  
+    updateTaskMutation.mutate({
+      id: editingTask.id,
+      title: newTitle,
+      description: newDescription,
+      category: newCategory,
+    });
+  
+    setEditingTask(null);
   };
-
-  const handleDelete = async (id: number): Promise<void> => {
-    try {
-      const response = await fetch(
-        "http://localhost:8085/trpc/task.deleteTask",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Task deleted:", data);
-
-      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== id));
-    } catch (error) {
-      console.error("Error deleting task:", error);
-    }
+  
+  const handleDelete = (id: number) => {
+    deleteTaskMutation.mutate({ id });
   };
 
   return (
@@ -190,20 +133,11 @@ export default function Display() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                const updatedTask = {
-                  id: editingTask.id,
-                  title: newTitle,
-                  description: newDescription,
-                  category: newCategory,
-                };
-                handleEditSubmit(updatedTask);
+                handleEditSubmit();
               }}
             >
               <div className="mb-4">
-                <label
-                  htmlFor="title"
-                  className="block text-sm font-medium text-red-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-red-700 mb-1">
                   Task Name
                 </label>
                 <input
@@ -214,32 +148,20 @@ export default function Display() {
                 />
               </div>
               <div className="mb-4">
-                <label
-                  htmlFor="description"
-                  className="block text-sm font-medium text-red-700 mb-1 "
-                >
+                <label className="block text-sm font-medium text-red-700 mb-1">
                   Description
                 </label>
                 <textarea
-                  name="description"
-                  id="description"
-                  rows={3}
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   className="w-full px-3 py-2 border bg-white text-green-800 border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Enter task description"
                 />
               </div>
               <div className="mb-4">
-                <label
-                  htmlFor="category"
-                  className="block text-sm font-medium text-red-700 mb-1 "
-                >
+                <label className="block text-sm font-medium text-red-700 mb-1">
                   Category
                 </label>
                 <select
-                  name="category"
-                  id="category"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="w-full px-3 py-2 border bg-white text-green-800 border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -252,22 +174,18 @@ export default function Display() {
                 </select>
               </div>
               <div className="flex space-x-2">
-                <div className="w-1/2">
-                  <button
-                    type="submit"
-                    className="  !bg-black/70 text-white rounded hover:!bg-black"
-                  >
-                    Save
-                  </button>
-                </div>
-                <div className="w-1/2">
-                  <button
-                    onClick={() => setEditingTask(null)}
-                    className="  !bg-black/70 text-white/100 rounded hover:!bg-black"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="!bg-black/70 text-white rounded hover:!bg-black"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingTask(null)}
+                  className="!bg-black/70 text-white rounded hover:!bg-black"
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
